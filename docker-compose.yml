@@ -1,0 +1,39 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: clinicdesk-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Your_password123"
+    ports:
+      - "1433:1433"
+    volumes:
+      - clinicdesk-sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clinicdesk-api
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ConnectionStrings__ClinicDesk: "Server=sqlserver,1433;Database=ClinicDesk;User Id=sa;Password=Your_password123;TrustServerCertificate=True"
+      Jwt__Issuer: "ClinicDesk"
+      Jwt__Audience: "ClinicDesk.Clients"
+      Jwt__SigningKey: "CHANGE_THIS_DEV_ONLY_SIGNING_KEY_32_BYTES_MIN"
+      Jwt__ExpirationMinutes: "60"
+      ClinicPolicy__FreeCancellationWindowHours: "24"
+      ClinicPolicy__SlotGenerationHorizonDays: "14"
+    ports:
+      - "8080:8080"
+
+volumes:
+  clinicdesk-sqlserver-data:
